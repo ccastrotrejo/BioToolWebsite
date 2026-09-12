@@ -1,19 +1,26 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import vue from '@vitejs/plugin-vue';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const workspaceRoot = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
+  root: resolve(workspaceRoot, 'apps/shell'),
+  publicDir: resolve(workspaceRoot, 'public'),
   base: './',
   plugins: [
     react(),
+    vue(),
     {
       name: 'biotool-offline-shell',
       generateBundle(_options, bundle) {
         const packageRoots = new Set([
-          resolve('node_modules/@fontsource/ibm-plex-sans'),
-          resolve('node_modules/@fontsource/ibm-plex-mono'),
+          resolve(workspaceRoot, 'node_modules/@fontsource/ibm-plex-sans'),
+          resolve(workspaceRoot, 'node_modules/@fontsource/ibm-plex-mono'),
         ]);
         for (const output of Object.values(bundle)) {
           if (output.type !== 'chunk') continue;
@@ -72,11 +79,12 @@ self.addEventListener('fetch', event => {
       },
     },
   ],
-  build: { chunkSizeWarningLimit: 2500 },
+  build: { outDir: resolve(workspaceRoot, 'dist'), emptyOutDir: true, manifest: true, chunkSizeWarningLimit: 2500 },
   test: {
+    root: workspaceRoot,
     environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['./apps/shell/src/test/setup.ts'],
+    include: ['apps/**/*.test.{ts,tsx}', 'packages/**/*.test.{ts,tsx}'],
     restoreMocks: true,
   },
 });

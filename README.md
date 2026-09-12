@@ -1,12 +1,13 @@
 # BioTool Web
 
-A local-first protein workbench built with React, strict TypeScript, Vite and
-Mol*. All parsing and analysis run in your browser; local files are not uploaded.
+A local-first protein workbench built with a React shell, a Vue 3 structure
+library, strict TypeScript, Vite and Mol*. All parsing and analysis run in your browser; local files are not uploaded.
 No Go service is needed for the current application.
 
 ## Run and build
 
 Requires Node.js **22.12+** and npm.
+Run all commands from the website root; npm installs the workspaces together.
 
 ```sh
 npm ci
@@ -57,7 +58,7 @@ The included `.github/workflows/ci.yml` works from that standalone root.
 ## Offline storage and privacy
 
 The production build installs a service worker that caches the app shell,
-fonts, lazy molecular viewer, parser worker and bundled example. Wait for
+fonts, lazy Vue library, lazy molecular viewer, parser worker and bundled example. Wait for
 **Ready for offline use** before going offline. The Vite development server
 does not install that production cache.
 
@@ -114,39 +115,70 @@ This migration does not yet implement trajectory simulation, assembly
 generation, structural alignment, contact maps, accounts or collaborative
 projects. Those require separate scientific and product decisions.
 
-## Architecture roadmap
+## React + Vue architecture
 
-The [roadmap](ROADMAP.md) includes an npm-workspaces monorepo with a React shell
-and a Vue 3 feature module. The first proposed Vue boundary is structure
-discovery/library UI. Independently deployed microfrontends are a later option,
-not a prerequisite for combining React and Vue or shipping the current site.
+This is an npm-workspaces monorepo. React owns the application shell and linked
+molecule, sequence and analysis views. Vue 3 owns the collection, device-library
+controls and structure-search dialog. Both use the same CSS tokens and ship in
+one versioned, offline-capable build. No runtime federation server is required.
+
+The shell lazy-loads `@biotool/structure-library` through the versioned
+`@biotool/contracts` API: `mount(container, snapshot, host)` returns
+`update(snapshot)` and `unmount()`. Updates preserve Vue's query and focus
+instead of remounting the app. Each instance cleans up its dialog and listeners.
+
+Snapshots contain **metadata only**: catalog entries, saved identifiers,
+filenames, display labels, residue counts and open/selected state. Source bytes,
+protein coordinates, React contexts and Vue reactive objects do not cross this
+boundary. Typed commands return to React for downloads, imports, IndexedDB
+changes and confirmations. The shell retains the only Mol* viewer and parser
+worker lifecycle.
+
+If the Vue module cannot load or render, the workbench remains available and
+the library explicitly enters **recovery mode**, with React open/import/search
+controls and a retry action. A browser may retain a failed module request until
+reload; if retry still fails, use the recovery controls and reload after the
+connection returns. This boundary isolates lifecycle failures, not untrusted
+code: both frameworks execute in the same page.
+
+The [roadmap](ROADMAP.md) tracks the remaining option of independently deployed
+microfrontends, including contract compatibility and atomic offline releases.
 
 ## Code map
 
 | Directory | Responsibility |
 | --- | --- |
-| `src/domain` | Shared scientific and source-file types |
-| `src/formats` | PDB, mmCIF and BinaryCIF parsing |
-| `src/analysis` | Composition and legacy propensity rules |
-| `src/workers` | Cancelable, off-main-thread parsing |
-| `src/data` | Source validation, downloads and IndexedDB library |
-| `src/viewer` | Mol* lifecycle, residue identity mapping and camera |
-| `src/features` | Linked React workbench and accessible controls |
-| `src/exports` | Source, FASTA and standalone HTML downloads |
+| `apps/shell/src` | React shell, linked workbench, error recovery |
+| `apps/shell/src/workers` | Cancelable, off-main-thread parsing |
+| `apps/shell/src/data` | Source validation, downloads and IndexedDB library |
+| `apps/shell/src/viewer` | Mol* lifecycle, residue identity mapping and camera |
+| `apps/structure-library/src` | Vue library/search, typed mount adapter and lifecycle tests |
+| `packages/contracts/src` | Framework-neutral versioned metadata and command contract |
+| `packages/core/src/domain` | Shared scientific and source-file types |
+| `packages/core/src/formats` | PDB, mmCIF and BinaryCIF parsing |
+| `packages/core/src/analysis` | Composition and legacy propensity rules |
+| `packages/core/src/exports` | Source, FASTA and standalone HTML downloads |
+| `packages/theme` | Shared CSS tokens, layout and accessible visual conventions |
 | `e2e` | Production-build browser workflows |
 
 ## Verification
 
 ```sh
 npm test
+npm run typecheck
 npm run build
 npx playwright install chromium
 npm run test:e2e
 ```
 
+The typecheck covers both React TypeScript and Vue SFCs (`vue-tsc`); the build
+also runs it. Unit tests cover scientific rules and the cross-framework lifecycle.
 The browser suite serves the production build. On Linux CI, install browser
 system dependencies with `npx playwright install --with-deps chromium`.
 The parent repository still runs the original Python regression suite.
+Normal tests need no Python checkout. To regenerate the committed golden
+triplet fixture from the original source, run
+`python3 packages/core/src/analysis/fixtures/generate_legacy.py /path/to/BioTool/biotool/app.py`.
 
 ## Data and dependencies
 
@@ -155,10 +187,11 @@ The bundled [`1CRN` mmCIF](https://files.rcsb.org/download/1CRN.cif) is from the
 Consult the [structure entry](https://www.rcsb.org/structure/1CRN) for its
 authors and primary citation. Catalog summaries are short original descriptions.
 
-Mol* is MIT-licensed; React and React DOM are MIT-licensed. IBM Plex Sans and
+Mol*, React, React DOM and Vue are MIT-licensed. IBM Plex Sans and
 IBM Plex Mono are distributed under the SIL Open Font License. See
 [Mol*](https://github.com/molstar/molstar),
-[React](https://github.com/facebook/react) and
+[React](https://github.com/facebook/react),
+[Vue](https://github.com/vuejs/core), and
 [IBM Plex](https://github.com/IBM/plex) for upstream licenses and credits.
 The production build includes `third-party-licenses.txt` with the license
 notices found in bundled dependency packages.

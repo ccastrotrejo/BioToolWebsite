@@ -15,6 +15,7 @@ async function openExample(page: Page, viewer = true) {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Crambin', exact: true })).toBeVisible();
   await expect(page.locator('.stat').first()).toContainText('46');
+  await expect(page.locator('#library-panel')).toHaveAttribute('data-framework', 'vue');
   if (viewer) await expect(page.locator('.viewer-stage')).toHaveAttribute('data-viewer-ready', 'true', { timeout: 45_000 });
 }
 
@@ -77,6 +78,7 @@ test('validates search, cancels downloads and preserves a valid view after faile
   await openExample(page);
   await page.getByRole('button', { name: 'Find a structure', exact: true }).click();
   const dialog = page.getByRole('dialog');
+  await expect(dialog).toHaveAttribute('data-framework', 'vue');
   await dialog.getByLabel('PDB identifier or example name').fill('../oops');
   await dialog.getByRole('button', { name: 'Open structure', exact: true }).click();
   await expect(dialog.getByRole('alert')).toContainText('Enter a PDB ID');
@@ -126,7 +128,7 @@ test('imports PDB and mmCIF locally, keeps scope separate and never uploads', as
   expect(remoteRequests).toEqual([]);
 });
 
-test('production shell, worker and molecular viewer reload entirely offline', async ({ page, context }) => {
+test('production shell, Vue library, worker and molecular viewer reload entirely offline', async ({ page, context }) => {
   await openExample(page);
   await expect(page.getByText('Ready for offline use', { exact: true })).toBeVisible({ timeout: 45_000 });
   await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
@@ -136,6 +138,89 @@ test('production shell, worker and molecular viewer reload entirely offline', as
   await expect(page.locator('.viewer-stage')).toHaveAttribute('data-viewer-ready', 'true', { timeout: 45_000 });
   await expect(page.getByText('Offline', { exact: true })).toBeVisible();
   await expect(page.locator('.stat').first()).toContainText('46');
+  await expect(page.locator('#library-panel')).toHaveAttribute('data-framework', 'vue');
+  await page.getByRole('button', { name: 'Find a structure', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveAttribute('data-framework', 'vue');
+  await page.getByRole('dialog').getByLabel('PDB identifier or example name').fill('crambin');
+  await page.getByRole('dialog').getByRole('button', { name: 'Open structure', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Crambin', exact: true })).toBeVisible();
+});
+
+test('Vue commands update the device library without resetting search or duplicating downloads', async ({ page }) => {
+  await openExample(page);
+  const downloads: string[] = [];
+  page.on('request', (request) => { if (request.url().includes('files.rcsb.org')) downloads.push(request.url()); });
+  const library = page.locator('#library-panel[data-framework="vue"]');
+  await library.evaluate((element) => element.setAttribute('data-instance-check', 'original'));
+  const fileChooser = page.waitForEvent('filechooser');
+  await library.getByRole('button', { name: 'Open a local file', exact: true }).click();
+  await (await fileChooser).setFiles({ name: 'vue-import.pdb', mimeType: 'text/plain', buffer: Buffer.from(multiChainPdb) });
+  await expect(page.getByRole('heading', { name: 'vue-import.pdb', exact: true })).toBeVisible();
+  await expect(library.getByText('2 saved', { exact: true })).toBeVisible();
+  await library.getByRole('button', { name: /1CRN Crambin/ }).click();
+  await expect(page.getByRole('heading', { name: 'Crambin', exact: true })).toBeVisible();
+  await library.getByRole('button', { name: /vue-import.pdb 6 observed residues/ }).click();
+  await expect(page.getByRole('heading', { name: 'vue-import.pdb', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Find a structure', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const query = dialog.getByLabel('PDB identifier or example name');
+  await query.fill('cramb');
+  // A real host-owned source update arrives while Vue has transient input state.
+  await page.getByLabel('Open local structure file').setInputFiles(example);
+  await expect(page.locator('.structure-title h1')).toHaveText('1crn.cif');
+  await expect(query).toHaveValue('cramb');
+  await expect(query).toBeFocused();
+  await expect(library).toHaveAttribute('data-instance-check', 'original');
+  await page.keyboard.press('Escape');
+  await library.getByRole('button', { name: 'Remove vue-import.pdb from device library', exact: true }).click();
+  await expect(library.getByRole('button', { name: /vue-import.pdb 6 observed residues/ })).toHaveCount(0);
+  page.once('dialog', (confirmation) => confirmation.dismiss());
+  await library.getByRole('button', { name: 'Clear saved files', exact: true }).click();
+  await expect(library.getByText('2 saved', { exact: true })).toBeVisible();
+  page.once('dialog', (confirmation) => confirmation.accept());
+  await library.getByRole('button', { name: 'Clear saved files', exact: true }).click();
+  await expect(library.getByText('0 saved', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1crn.cif', exact: true })).toBeVisible();
+  await expect(page.locator('.molecular-canvas > canvas')).toHaveCount(1);
+  expect(downloads).toEqual([]);
+});
+
+test('a failed Vue chunk leaves the molecule and explicit React recovery controls usable', async ({ browser, baseURL }) => {
+  const manifest: Record<string, { file: string; isDynamicEntry?: boolean }> =
+    JSON.parse(await readFile(new URL('../dist/.vite/manifest.json', import.meta.url), 'utf8'));
+  const entry = Object.entries(manifest).find(([key, value]) => key.includes('structure-library') && value.isDynamicEntry)?.[1];
+  expect(entry, 'Vue must remain a separately lazy-loaded entry').toBeDefined();
+  const context = await browser.newContext({ baseURL, serviceWorkers: 'block' });
+  const page = await context.newPage();
+  try {
+    await page.route(`**/${entry!.file}`, (route) => route.abort());
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Crambin', exact: true })).toBeVisible();
+    await expect(page.locator('.viewer-stage')).toHaveAttribute('data-viewer-ready', 'true', { timeout: 45_000 });
+    await expect(page.locator('#library-panel')).toHaveAttribute('data-framework', 'react-recovery');
+    await expect(page.getByRole('alert')).toContainText('Library recovery mode');
+    await page.locator('.sequence-residue').first().click();
+    await expect(page.locator('.selection-inspector')).toContainText('THR 1');
+    await page.getByRole('button', { name: 'Retry Vue library', exact: true }).click();
+    await expect(page.locator('#library-panel')).toHaveAttribute('data-framework', 'react-recovery');
+    await page.getByRole('button', { name: 'Find a structure', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toHaveAttribute('data-framework', 'react-recovery');
+    await expect(dialog.getByRole('alert')).toContainText('Library recovery mode');
+    await dialog.getByLabel('PDB identifier or example name').fill('1CRN');
+    await dialog.getByRole('button', { name: 'Open structure', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Open a local file', exact: true }).click();
+    await (await chooser).setFiles({ name: 'recovery.pdb', mimeType: 'text/plain', buffer: Buffer.from(multiChainPdb) });
+    await expect(page.getByRole('heading', { name: 'recovery.pdb', exact: true })).toBeVisible();
+    await expect(page.locator('.stat').first()).toContainText('6');
+    await page.unroute(`**/${entry!.file}`);
+    await page.reload();
+    await expect(page.locator('#library-panel')).toHaveAttribute('data-framework', 'vue');
+    await expect(page.locator('.library-recovery')).toHaveCount(0);
+  } finally { await context.close(); }
 });
 
 test('a corrupt saved source fails explicitly and can recover from the empty workspace', async ({ page }) => {

@@ -1,0 +1,21 @@
+{
+  "name": "@biotool/structure-library",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/public.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@biotool/contracts": "0.1.0",
+    "@biotool/core": "0.1.0",
+    "@biotool/theme": "0.1.0",
+    "vue": "3.5.42"
+  }
+}

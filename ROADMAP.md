@@ -2,16 +2,16 @@
 
 ## Direction
 
-Ship the working React + TypeScript migration first, then evolve it into a
-monorepo that can host a Vue 3 + TypeScript feature. This is a planned
-architecture evolution, not a description of the current implementation.
+The React + TypeScript migration is published. The website now uses npm
+workspaces with a Vue 3 + TypeScript discovery/library feature. Phases 1-3
+describe the implemented architecture; phase 4 remains a future decision.
 
-**Recommendation:** use npm workspaces and a React application shell, introduce
-one clearly bounded Vue module, and initially release them together. Multiple
+**Current release model:** a React application shell and one clearly bounded
+Vue module release together. Multiple
 frameworks do not require runtime Module Federation or separate deployments.
 Keep those options available without taking on their operational costs early.
 
-## Phase 1: Complete the current migration
+## Phase 1: Complete the current migration — implemented
 
 Finish and publish the standalone application in
 [ccastrotrejo/BioToolWebsite](https://github.com/ccastrotrejo/BioToolWebsite).
@@ -21,12 +21,12 @@ offline behavior, accessible controls, and self-contained exports.
 Gate: the production build passes scientific, component and real-browser
 workflows, including actual molecular rendering and cross-view selection.
 
-## Phase 2: Introduce workspace boundaries
+## Phase 2: Introduce workspace boundaries — implemented
 
 Convert the website repository to npm workspaces. Keep the current package
 manager; add a task orchestrator only if measured build/test costs justify it.
 
-Proposed layout:
+Current layout:
 
 ```text
 apps/
@@ -45,12 +45,11 @@ additional packages until a real boundary or a second consumer needs them.
 Gate: the React app still works with unchanged scientific results, existing
 offline behavior and no dependency on the old Python repository.
 
-## Phase 3: Deliver one Vue feature
+## Phase 3: Deliver one Vue feature — implemented
 
-The initial candidate is the **structure discovery and device-library UI**.
-It has a clearer boundary than dividing the tightly linked molecule, sequence
-and analysis views across frameworks. Confirm the feature boundary before
-implementation; a report-builder module is another possible future candidate.
+Vue owns the **structure discovery and device-library UI**, including search,
+validation, collection buttons and saved-file controls. The tightly linked
+molecule, sequence and analysis views remain together in React.
 
 Use an explicit framework-neutral `mount / update / unmount` adapter. The React
 shell gives the Vue module read-only library snapshots and typed callbacks for
@@ -70,9 +69,9 @@ the boundary. Use plain typed payloads with stable source/residue identifiers.
 Share visual tokens, not framework-specific component implementations. Scope
 Vue styles so they cannot restyle the rest of the workbench.
 
-The first Vue module must not add uploads or remote services. Its failure must
-leave the existing molecular workspace usable, with basic open/import recovery
-available from the shell.
+The Vue module adds no uploads or remote services. Its failures leave the
+existing molecular workspace usable, with explicitly labeled React recovery
+controls for opening, importing, searching and managing saved files.
 
 Gate: contract tests plus browser tests prove React-to-Vue commands, Vue-to-React
 events, repeated mount/unmount, keyboard/focus behavior, theme consistency,

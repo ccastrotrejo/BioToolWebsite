@@ -1,0 +1,18 @@
+{
+  "name": "@biotool/shell",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@biotool/contracts": "0.1.0",
+    "@biotool/core": "0.1.0",
+    "@biotool/structure-library": "0.1.0",
+    "@biotool/theme": "0.1.0",
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "molstar": "5.11.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-error-boundary": "6.0.0"
+  }
+}

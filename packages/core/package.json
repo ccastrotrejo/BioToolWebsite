@@ -1,0 +1,14 @@
+{
+  "name": "@biotool/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./accession": "./src/accession.ts",
+    "./analysis/*": "./src/analysis/*.ts",
+    "./formats/*": "./src/formats/*.ts",
+    "./domain/*": "./src/domain/*.ts",
+    "./exports/*": "./src/exports/*.ts"
+  },
+  "dependencies": { "molstar": "5.11.0" }
+}
