@@ -1,0 +1,2 @@
+# Preserve downloaded coordinate files byte-for-byte, including archive spacing.
+public/examples/*.cif -text -whitespace

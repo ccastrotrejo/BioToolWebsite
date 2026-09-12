@@ -1,0 +1,9 @@
+{
+  "date": "2026-09-12",
+  "palette": "Existing slate/cyan from biotool/theme.py, translated into portable light/dark web tokens",
+  "fonts": "Local IBM Plex Sans and IBM Plex Mono",
+  "motion": "CSS state feedback and intentional molecular camera transitions",
+  "spacing": "4-point scale",
+  "framework": "React + TypeScript + Vite",
+  "scope": "Live scientific application, not a marketing landing page"
+}

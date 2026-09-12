@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2026-09-12",
+    "macrostructure": "Workbench",
+    "theme": "BioTool slate/cyan",
+    "enrichment": "Real molecular visualization",
+    "brief": "Linked structure, observed sequence and protein analysis",
+    "nav": "Inline search",
+    "footer": "Inline rule"
+  }
+]
